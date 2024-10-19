@@ -5,9 +5,11 @@ import pdfkit
 import img2pdf
 import markdown
 import speedtest
+from drf_yasg.utils import swagger_auto_schema
 from pdf2docx import Converter
 from transformers import pipeline
-from .serializers import TextSummarySerializer, SpeedTestResultSerializer, MarkdownFileSerializer, PDFFileSerializer, ImageFileSerializer,YouTubeDownloadSerializer
+from .serializers import TextSummarySerializer, SpeedTestResultSerializer, MarkdownFileSerializer, PDFFileSerializer, \
+    ImageFileSerializer, YouTubeDownloadSerializer, BarcodeSerializer, QRCodeSerializer
 from pdf2image import convert_from_path
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -16,6 +18,9 @@ import os
 import tempfile
 from django.http import FileResponse, HttpResponse, StreamingHttpResponse
 import yt_dlp
+from barcode import EAN13
+from barcode.writer import ImageWriter
+import qrcode
 
 
 class home(APIView):
@@ -49,6 +54,9 @@ class SpeedTest(APIView):
 
 
 class TextSummarizer(APIView):
+    @swagger_auto_schema(
+        request_body=TextSummarySerializer
+    )
     def post(self, request):
         serializer = TextSummarySerializer(data=request.data)
 
@@ -64,7 +72,9 @@ class TextSummarizer(APIView):
 
 
 class MarkdownToPDFView(APIView):
-
+    @swagger_auto_schema(
+        request_body=MarkdownFileSerializer
+    )
     def post(self, request):
         serializer = MarkdownFileSerializer(data=request.data)
 
@@ -85,6 +95,9 @@ class MarkdownToPDFView(APIView):
 
 
 class PDFToDOCXView(APIView):
+    @swagger_auto_schema(
+        request_body=PDFFileSerializer
+    )
     def post(self, request):
         serializer = PDFFileSerializer(data=request.data)
 
@@ -112,6 +125,9 @@ class PDFToDOCXView(APIView):
 
 
 class PDFToIMGView(APIView):
+    @swagger_auto_schema(
+        request_body=PDFFileSerializer
+    )
     def post(self, request):
         serializer = PDFFileSerializer(data=request.data)
 
@@ -151,6 +167,9 @@ class PDFToIMGView(APIView):
 
 
 class ImagesToPDFView(APIView):
+    @swagger_auto_schema(
+        request_body=ImageFileSerializer
+    )
     def post(self, request):
         serializer = ImageFileSerializer(data=request.data)
         if serializer.is_valid():
@@ -178,6 +197,9 @@ class ImagesToPDFView(APIView):
 
 
 class YouTubeDownloadView(APIView):
+    @swagger_auto_schema(
+        request_body=YouTubeDownloadSerializer
+    )
     def post(self, request):
         serializer = YouTubeDownloadSerializer(data=request.data)
 
@@ -233,5 +255,111 @@ class YouTubeDownloadView(APIView):
 
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BarcodeView(APIView):
+    @swagger_auto_schema(
+        request_body=BarcodeSerializer
+    )
+    def post(self, request):
+        serializer = BarcodeSerializer(data=request.data)
+
+        if serializer.is_valid():
+            data = serializer.validated_data['data']
+            try:
+                # Step 1: Create a temporary directory
+                temp_dir = tempfile.mkdtemp()
+                filename = os.path.join(temp_dir, "barcode.png")
+
+                # Step 2: Generate the barcode
+                barcode = EAN13(data, writer=ImageWriter())
+                full_path = barcode.save(filename)  # Save and get the path
+
+                # Step 3: Ensure the file exists and log the path
+                if not os.path.exists(full_path):
+                    raise FileNotFoundError(f"Barcode not found at: {full_path}")
+
+                print(f"Barcode generated at: {full_path}")  # Log the path
+
+                # Step 4: Open the file and prepare the response
+                file = open(full_path, 'rb')
+                response = FileResponse(file, content_type='image/png')
+                response['Content-Disposition'] = 'attachment; filename="barcode.png"'
+
+                # Step 5: Attach cleanup logic to response
+                def cleanup():
+                    try:
+                        file.close()
+                        os.remove(full_path)
+                        os.rmdir(temp_dir)
+                        print(f"Cleaned up: {full_path}")
+                    except Exception as cleanup_error:
+                        print(f"Cleanup error: {cleanup_error}")
+
+                # Attach the cleanup function to the response
+                # response.close = cleanup
+
+                return response
+
+            except Exception as e:
+                return Response(
+                    {"error": f"An error occurred: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QRCodeView(APIView):
+    @swagger_auto_schema(
+        request_body=QRCodeSerializer
+    )
+    def post(self, request):
+        serializer = QRCodeSerializer(data=request.data)
+
+        if serializer.is_valid():
+            data = serializer.validated_data['data']
+            try:
+                # Step 1: Create a temporary directory
+                temp_dir = tempfile.mkdtemp()
+                filename = os.path.join(temp_dir, "qr_code.png")
+
+                # Step 2: Generate the QR code
+                qr = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_L,
+                    box_size=15,
+                    border=2,
+                )
+                qr.add_data(data)
+                qr.make(fit=True)
+
+                # Step 3: Save the QR code image
+                img = qr.make_image(fill_color="black", back_color="white")
+                img.save(filename)
+
+                # Step 4: Open the file and return it in the response
+                file = open(filename, 'rb')
+                response = FileResponse(file, content_type='image/png')
+                response['Content-Disposition'] = 'attachment; filename="qr_code.png"'
+
+                # Step 5: Attach cleanup logic to response
+                def cleanup():
+                    try:
+                        file.close()
+                        os.remove(filename)
+                        os.rmdir(temp_dir)
+                    except Exception as cleanup_error:
+                        print(f"Cleanup error: {cleanup_error}")
+
+                return response
+
+            except Exception as e:
+                return Response(
+                    {"error": f"An error occurred: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

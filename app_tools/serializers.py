@@ -64,3 +64,22 @@ class YouTubeDownloadSerializer(serializers.Serializer):
         if not value.startswith("https://www.youtube.com") and not value.startswith("https://youtube"):
             raise serializers.ValidationError("Invalid YouTube URL.")
         return value
+
+
+class BarcodeSerializer(serializers.Serializer):
+    data = serializers.CharField(
+        min_length=12, max_length=12,
+        help_text="EAN-13 barcode requires exactly 12 numeric digits."
+    )
+
+    def validate_data(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("The barcode data must be numeric.")
+        return value
+
+
+
+class QRCodeSerializer(serializers.Serializer):
+    data = serializers.CharField(
+        help_text="Enter the data to be encoded in the QR code."
+    )
