@@ -180,7 +180,7 @@ class ImagesToPDFView(APIView):
                         img_file.seek(0)
                         temp_img.write(img_file.read())
                         image_paths.append(temp_img.name)
-                image_paths.reverse()
+                # image_paths.reverse()
                 pdf_file_path = 'output.pdf'
                 with open(pdf_file_path, "wb") as pdf_file:
                     layout = img2pdf.get_layout_fun((img2pdf.mm_to_pt(210), img2pdf.mm_to_pt(297)))
