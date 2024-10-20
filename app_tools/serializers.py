@@ -3,16 +3,16 @@ from rest_framework import serializers
 import mimetypes
 
 
-class TextSummarySerializer(serializers.Serializer):
-    text = serializers.CharField(max_length=5000, allow_blank=False, trim_whitespace=False)
-    min_length = serializers.IntegerField()
-    max_length = serializers.IntegerField()
+# class TextSummarySerializer(serializers.Serializer):
+#     text = serializers.CharField(max_length=5000, allow_blank=False, trim_whitespace=False)
+#     min_length = serializers.IntegerField()
+#     max_length = serializers.IntegerField()
 
 
-class SpeedTestResultSerializer(serializers.Serializer):
-    download_speed = serializers.FloatField()
-    upload_speed = serializers.FloatField()
-    ping = serializers.FloatField()
+# class SpeedTestResultSerializer(serializers.Serializer):
+#     download_speed = serializers.FloatField()
+#     upload_speed = serializers.FloatField()
+#     ping = serializers.FloatField()
 
 
 class MarkdownFileSerializer(serializers.Serializer):
